@@ -16,9 +16,7 @@ os.environ['AWS_SECRET_ACCESS_KEY']=config['AWS']['AWS_SECRET_ACCESS_KEY']
 
 
 def create_spark_session():
-    """
-    Builds a Spark session
-    """
+    """Builds a Spark session"""
     
     spark = SparkSession \
         .builder \
@@ -29,14 +27,20 @@ def create_spark_session():
 
 
 def process_song_data(spark, input_data, output_data):
-    """
+    """Processes song data to partioned parquet files
+    
     - Reads in song data from partitioned json files to schema defined dataframe.
     - Builds song dimension table from selected selected dataframe columns and writes table to partitioned parquet files.
     - Builds artitst dimension table from selected dataframe columns and writes table to partitioned parquet files.
+    
+    Parameters:
+    spark (object): Built spark session instance
+    input_data (str): Path to partitioned source data
+    output_data (str): Path to written partitioned parquet files
     """
     
-    # get filepath to song data file
-    song_data = os.path.join(input_data, 'song_data/A/A/A/*.json')
+    # sets filepath to song data files
+    song_data = os.path.join(input_data, 'song_data/*/*/*/*.json')
     
     # Set song table column schema
     song_schema = R([
@@ -52,7 +56,7 @@ def process_song_data(spark, input_data, output_data):
         Fld('year', Int()),
     ])
     
-    # read song data file
+    # reads song data files to dataframe
     df = spark.read.json(song_data, song_schema)
 
     # extract columns to create songs table
@@ -69,21 +73,27 @@ def process_song_data(spark, input_data, output_data):
 
 
 def process_log_data(spark, input_data, output_data):
-    """
+    """Processes app event log data to partioned parquet files
+    
     - Reads in app activity logs from partitioned json files to a dataframe, then filtered on songplay user action.
     - Builds users dimension table from selected dataframe columns and writes table to partitioned parquet files.
     - Converted timestamp column added to dataframe.
     - Bulds time dimension table from selected dataframe columns and writes table to partitioned parquet files.
     - Builds a songplays fact table from artist, song and log data and writes table to partitioned parquet files.
+    
+    Parameters:
+    spark (object): Built spark session instance
+    input_data (str): Path to partitioned source data
+    output_data (str): Path to written partitioned parquet files
     """
     
-    # get filepath to log data file
+    # sets filepath to log data files
     log_data = os.path.join(input_data, 'log_data/*/*/*.json')
 
-    # read log data file
+    # read log data files to dataframe
     df = spark.read.json(log_data)
     
-    # filter by actions for song plays
+    # filters dataframe on 'page' column based on 'Nextsong' event
     df = df.filter(col("page") == 'NextSong')
 
     # extract columns for users table    
@@ -92,7 +102,7 @@ def process_log_data(spark, input_data, output_data):
     # write users table to parquet files
     users_table.write.mode("overwrite").parquet(output_data + 'users')
 
-    # create timestamp column from original timestamp column
+    # create timestamp column from original dataframe ts column
     get_timestamp = udf(lambda x: datetime.fromtimestamp(x / 1000), TimestampType())
     df = df.withColumn("start_time", get_timestamp(df.ts))
     
@@ -137,12 +147,7 @@ def process_log_data(spark, input_data, output_data):
 
 
 def main():
-    """
-    - Creates spark session
-    - Sets input/output data paths
-    - Processes song data files
-    - Processes activity log data
-    """
+    """Main script function"""
     
     spark = create_spark_session()
     input_data = "s3a://udacity-dend/"
